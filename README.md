@@ -87,14 +87,7 @@ gantt
 
 <br>
 
-## Data Ingestion W/ S3
-> creation of the AWS account, cost alert, ingestion of external data into the S3 bucket with Python code and in Parquet format, in addition to configuring the Data Lake on AWS
-
-<br>
-
-### The Environment
-
-#### Architecture
+## Architecture
 ```mermaid
 flowchart LR
   subgraph aws_cloud
@@ -113,8 +106,9 @@ flowchart LR
 ```Lake Formation``` for Data Lake constructions with data centralization and better information management </br>
 ```Security Layer``` "IAM" service to create an auxiliary user that will insert Data into the Lake </br>
 
-#### Data Scraping
+<br>
 
+## Data Scraping
 ```python
 # %% [markdown]
 ## imports
@@ -217,10 +211,9 @@ if __name__ == "__main__":
 
 > In this table we have information on how and when the request was opened, when it was closed, what the status is, the reason for this request and the corresponding grouping
 
-### ETL
+<br>
 
-#### Connect to S3
-
+## Connect to S3
 ```python
 # %% [markdown]
 ## imports
@@ -282,11 +275,9 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 ```
 
-#### Save to Parquet
-
+## Save to Parquet
 ```python
 # %% [markdown]
 ## imports
@@ -365,46 +356,30 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 ```
 
 > ['bronze/', 'bronze/dados_2015.parquet', 'bronze/dados_2016.parquet', 'bronze/dados_2017.parquet', 'bronze/dados_2018.parquet', 'bronze/dados_2019.parquet', 'bronze/dados_2020.parquet', 'silver/']
 
 <br>
 
-## Data Processing W/ Glue
-> creation of ETL and silver layer, least privilege filter and data check with Athena
+## Glue Crawler
+## Data Catalog
+## Glue Studio
+## Glue Data Quality
+## Glue Data Brew
 
 <br>
 
-### Glue Crawler
-### Data Catalog
-### Glue Studio
-### Glue Data Quality
-### Glue Data Brew
+## EMR Environment
+## Configuring EMR cluster
+## Spark Script
+## Result and Permission
+## Running the Job
 
 <br>
 
-## Data Processing W/ EMR
-> distributed processing for big data, cluster creation and creation of the gold layer
-
-<br>
-
-### EMR Environment
-### Configuring EMR cluster
-### Spark Script
-### Result and Permission
-### Running the Job
-
-<br>
-
-## Data Analysis W/ Athena and Quicksight
-> data analysis and Dashboard creation
-
-<br>
-
-### Quicksight Environment
-### Starting
-### DataViz
-### Additional Features
-### New Features
+## Quicksight Environment
+## Starting
+## DataViz
+## Additional Features
+## New Features
