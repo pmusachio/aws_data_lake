@@ -91,20 +91,32 @@ gantt
 ```mermaid
 flowchart LR
   subgraph aws_cloud
-    s3_bronze --> lake_formation
+    s3_bronze --- lake_formation
+    s3_bronze --- glue_crawler
+    glue_crawler --- glue_catalog
+    glue_catalog --- glue
+    glue --- s3_silver
+    glue_data_quality --- s3_silver
+    glue_data_brew --- s3_silver
     subgraph security_layer
         direction BT
         IAM
     end
   end
-  external_files --> s3_bronze
+  external_files --- s3_bronze
 ```
 
 ```External Files``` represents data scraped from the internet </br>
 ```Bucket S3 -> Bronze layer``` to store raw data </br>
-```Bucket S3 -> Silver layer``` to store processed data </br>
 ```Lake Formation``` for Data Lake constructions with data centralization and better information management </br>
 ```Security Layer``` "IAM" service to create an auxiliary user that will insert Data into the Lake </br>
+
+```Glue Crawler``` extract informations from ```Bucket S3``` and creation of table W/ ```Glue Catalog``` </br>
+```Glue Catalog``` storing table informations </br>
+```Glue``` ETL creation and information processing </br>
+```Bucket S3 -> Silver layer``` to store processed data </br>
+```Glue Data Quality``` quality of informations </br>
+```Glue Data Brew``` processing services and ```Silver layer``` creation
 
 <br>
 
