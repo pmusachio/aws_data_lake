@@ -376,8 +376,68 @@ if __name__ == "__main__":
 
 <br>
 
-## Glue Crawler
 ## Data Catalog
+#### Table Schema to Silver Layer
+
+```JSON
+[
+    {"Name": "case_enquiry_id", "Type": "bigint"},
+    {"Name": "open_dt", "Type": "timestamp"},
+    {"Name": "target_dt", "Type": "timestamp"},
+    {"Name": "closed_dt", "Type": "timestamp"},
+    {"Name": "ontime", "Type": "string"},
+    {"Name": "case_status", "Type": "string"},
+    {"Name": "case_title", "Type": "string"},
+    {"Name": "subject", "Type": "string"},
+    {"Name": "reason", "Type": "string"},
+    {"Name": "type", "Type": "string"},
+    {"Name": "queue", "Type": "string"},
+    {"Name": "department", "Type": "string"},
+    {"Name": "submittedphoto", "Type": "string"},
+    {"Name": "closedphoto", "Type": "string"},
+    {"Name": "location", "Type": "string"},
+    {"Name": "fire_district", "Type": "string"},
+    {"Name": "pwd_district", "Type": "string"},
+    {"Name": "city_council_district", "Type": "string"},
+    {"Name": "police_district", "Type": "string"},
+    {"Name": "neighborhood", "Type": "string"},
+    {"Name": "neighborhood_services_district", "Type": "string"},
+    {"Name": "ward", "Type": "string"},
+    {"Name": "precinct", "Type": "string"},
+    {"Name": "location_street_name", "Type": "string"},
+    {"Name": "location_zipcode", "Type": "string"},
+    {"Name": "latitude", "Type": "string"},
+    {"Name": "longitude", "Type": "string"},
+    {"Name": "source", "Type": "string"},
+    {"Name": "closure_reason_normalized", "Type": "string"},
+    {"Name": "duration_hours", "Type": "double"}
+]
+```
+
+<br>
+
+#### Regex used on Glue (Regular expression)
+```Regex
+^Case Closed\. Closed date : \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ (.*)
+```
+
+<br>
+
+#### duration
+```SQL
+select tb_1.*,
+round(unix_timestamp(closed_dt)-unix_timestamp(open_dt))/3600,0) AS duration_hours
+from tb_1
+```
+
+<br>
+
+
+
+
+
+
+
 ## Glue Studio
 ## Glue Data Quality
 ## Glue Data Brew
