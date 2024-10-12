@@ -88,6 +88,7 @@ gantt
 <br>
 
 ## Architecture
+
 ```mermaid
 flowchart LR
   subgraph aws_cloud
@@ -121,172 +122,188 @@ flowchart LR
 <br>
 
 ## The Environment
-## ETL
-## Data Lake
-## Database in Lake Formation
-## Expenses associated with Project
-## Glue Crawler
-## Data Catalog
-## AWS Connect | Create Bucket W/ Layers | Scapping | Transform to Parquet | Load to Bronze
 
 ```python
-#%% [markdown]
+
+```
+
+## ETL
+
+```python
+# %% [markdown]
 ## imports
 
-#%%
+# %%
+import os
 import urllib.request
 import pandas as pd
 import boto3
 from io import BytesIO
 
-#%% [markdown]
-## client config
-
-#%%
-def connect_to_s3():
-    """
-    Connect to AWS S3 using the default session/profile.
-    
-    Returns:
-    boto3.client: Boto3 S3 client object.
-    """
-    return boto3.client("s3")
-
-#%%
-def create_bucket(bucket_name, region=None):
-    """
-    Function to create an S3 bucket.
-
-    Parameters:
-    bucket_name (str): Name of the S3 bucket.
-    region (str, optional): AWS region name. Default is None.
-    """
-    s3_client = boto3.client('s3')
-    try:
-        if region is None:
-            s3_client.create_bucket(Bucket=bucket_name)
-        else:
-            location = {'LocationConstraint': region}
-            s3_client.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=location)
-        
-        print(f"Bucket '{bucket_name}' successfully created.")
-    except Exception as e:
-        print(f"Error creating bucket: {e}")
-
-#%%
-def create_layers(bucket_name, s3_client):
-    """
-    Create the directory structure in the S3 bucket.
-
-    Parameters:
-    bucket_name (str): Name of the S3 bucket.
-    s3_client (boto3.client): Boto3 S3 client object.
-    """
-    folders = ['bronze/', 'silver/', 'gold/']
-    for folder in folders:
-        try:
-            s3_client.put_object(Bucket=bucket_name, Key=folder)
-            print(f"Folder '{folder}' created in bucket '{bucket_name}'")
-        except Exception as e:
-            print(f"Error creating folder '{folder}' in bucket '{bucket_name}': {e}")
-
-#%% [markdown]
+# %% [markdown]
 ## etl
 
-#%%
-def extract_to_parquet(url):
+# %%
+def create_data_dir(directory):
     """
-    Download data from a URL, transform it to Parquet format, and return it as a buffer.
+    Create a directory if it does not exist.
+
+    Parameters:
+    directory (str): Path of the directory to be created.
+    """
+    os.makedirs(directory, exist_ok=True)
+
+# %%
+def extract_data(url, filename):
+    """
+    Download data from a URL and save it to a specified filename.
 
     Parameters:
     url (str): URL of the file to download.
+    filename (str): Local path where the file will be saved.
+    """
+    try:
+        urllib.request.urlretrieve(url, filename)
+        print(f"scraping was done -> {filename}")
+    except Exception as e:
+        print(f"Houston, we have a problem in {filename}: {e}")
+
+# %%
+def load_data(files, data_dir):
+    """
+    Load data from a list of files into a dictionary of DataFrames.
+
+    Parameters:
+    files (list of tuples): List of tuples containing URLs and filenames.
+    data_dir (str): Directory where the files will be saved.
 
     Returns:
-    BytesIO: In-memory bytes buffer containing Parquet data.
+    dict: Dictionary where keys are years and values are DataFrames.
     """
-    try:
-        with urllib.request.urlopen(url) as response:
-            df = pd.read_csv(response)
-            parquet_buffer = BytesIO()
-            df.to_parquet(parquet_buffer, engine='pyarrow', index=False)
-            parquet_buffer.seek(0)
-            print(f"Download and transformation to Parquet completed for {url}")
-            return parquet_buffer
-    except Exception as e:
-        print(f"Error in processing {url}: {e}")
-        return None
+    dfs = {}
+    for url, filename in files:
+        filepath = os.path.join(data_dir, filename)
+        extract_data(url, filepath)
+        ano = filename.split("_")[-1].split(".")[0]
+        dfs[ano] = pd.read_csv(filepath)
+    return dfs
 
-#%%
-def buffer_to_bucket(parquet_buffer, bucket_name, object_name, s3_client):
+# %% [markdown]
+## S3
+
+# %%
+def connect_to_s3(aws_access_key_id, aws_secret_access_key, region_name):
     """
-    Upload Parquet buffer to AWS S3.
+    Set up a session and connect to AWS S3.
 
     Parameters:
-    parquet_buffer (BytesIO): In-memory bytes buffer containing Parquet data.
+    aws_access_key_id (str): AWS access key ID.
+    aws_secret_access_key (str): AWS secret access key.
+    region_name (str): AWS region name.
+
+    Returns:
+    boto3.client: Boto3 S3 client object.
+    """
+    boto3.setup_default_session(
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        region_name=region_name,
+    )
+    return boto3.client("s3")
+
+# %%
+def upload_to_s3(dfs, bucket_name, s3_client):
+    """
+    Upload DataFrames to AWS S3 as Parquet files.
+
+    Parameters:
+    dfs (dict): Dictionary where keys are years and values are DataFrames.
     bucket_name (str): Name of the S3 bucket.
-    object_name (str): Name of the object in S3.
     s3_client (boto3.client): Boto3 S3 client object.
     """
-    try:
+    for ano, df in dfs.items():
+        parquet_buffer = BytesIO()
+        df.to_parquet(parquet_buffer, engine='pyarrow')
         s3_client.put_object(
             Bucket=bucket_name,
-            Key=object_name,
+            Key=f"bronze/dados_{ano}.parquet",
             Body=parquet_buffer.getvalue(),
         )
-        print(f"Upload to S3 completed for {object_name}")
-    except Exception as e:
-        print(f"Error uploading {object_name} to S3: {e}")
+        print(f"dados_{ano}.parquet upload to S3")
 
-#%%
-def load_to_bronze(files, bucket_name, s3_client):
+# %%
+def list_contents(bucket_name, s3_client):
     """
-    Process each file in the list by downloading, transforming to Parquet, and uploading to S3.
+    List the contents of an S3 bucket.
 
     Parameters:
-    files (list of tuples): List of tuples containing URLs and S3 object names.
     bucket_name (str): Name of the S3 bucket.
     s3_client (boto3.client): Boto3 S3 client object.
-    """
-    for url, object_name in files:
-        parquet_buffer = extract_to_parquet(url)
-        if parquet_buffer:
-            # Upload to the "bronze" folder inside the bucket
-            buffer_to_bucket(parquet_buffer, bucket_name, f"bronze/{object_name}", s3_client)
 
-#%% [markdown]
+    Returns:
+    list: List of keys in the S3 bucket.
+    """
+    response = s3_client.list_objects(Bucket=bucket_name)
+    keys = [obj["Key"] for obj in response.get("Contents", [])]
+    print(keys)
+    return keys
+
+# %% [markdown]
 ## main
 
-#%%
+# %%
 def main():
     """
-    Main function to orchestrate the data extraction, transformation, 
+    Main function to orchestrate the data extraction, loading, 
     and uploading processes.
     """
-    # S3
-    s3_client = connect_to_s3()
-    create_bucket(BUCKET_NAME, region_name)
-    create_layers(BUCKET_NAME, s3_client)
+    from environment_setup import setup_environment
 
-    # transform and load
-    load_to_bronze(FILES, BUCKET_NAME, s3_client)
+    # Set up environment (create bucket, set account, etc.)
+    setup_environment()
 
-if __name__ == "__main__":
-    # constants
+    # Define constants
+    DATA_DIR = "../data"
     BUCKET_NAME = "laranjao-datalakeaws"
-    region_name = "us-east-1"
     FILES = [
-    ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/c9509ab4-6f6d-4b97-979a-0cf2a10c922b/download/311_service_requests_2015.csv", "data_2015.parquet"),
-    ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/b7ea6b1b-3ca4-4c5b-9713-6dc1db52379a/download/311_service_requests_2016.csv", "data_2016.parquet"),
-    ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/30022137-709d-465e-baae-ca155b51927d/download/311_service_requests_2017.csv", "data_2017.parquet"),
-    ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/2be28d90-3a90-4af1-a3f6-f28c1e25880a/download/311_service_requests_2018.csv", "data_2018.parquet"),
-    ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/ea2e4696-4a2d-429c-9807-d02eb92e0222/download/311_service_requests_2019.csv", "data_2019.parquet"),
-    ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/6ff6a6fd-3141-4440-a880-6f60a37fe789/download/script_105774672_20210108153400_combine.csv", "data_2020.parquet"),
+        ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/c9509ab4-6f6d-4b97-979a-0cf2a10c922b/download/311_service_requests_2015.csv", "dados_2015.csv"),
+        ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/b7ea6b1b-3ca4-4c5b-9713-6dc1db52379a/download/311_service_requests_2016.csv", "dados_2016.csv"),
+        ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/30022137-709d-465e-baae-ca155b51927d/download/311_service_requests_2017.csv", "dados_2017.csv"),
+        ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/2be28d90-3a90-4af1-a3f6-f28c1e25880a/download/311_service_requests_2018.csv", "dados_2018.csv"),
+        ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/ea2e4696-4a2d-429c-9807-d02eb92e0222/download/311_service_requests_2019.csv", "dados_2019.csv"),
+        ("https://data.boston.gov/dataset/8048697b-ad64-4bfc-b090-ee00169f2323/resource/6ff6a6fd-3141-4440-a880-6f60a37fe789/download/script_105774672_20210108153400_combine.csv", "dados_2020.csv"),
     ]
 
+    # Define AWS credentials
+    aws_access_key_id = "YOUR_AWS_ACCESS_KEY_ID"
+    aws_secret_access_key = "YOUR_AWS_SECRET_ACCESS_KEY"
+    region_name = "us-east-2"
+
+    # Create data directory
+    create_data_dir(DATA_DIR)
+
+    # Load data
+    dfs = load_data(FILES, DATA_DIR)
+
+    # Connect to S3
+    s3_client = connect_to_s3(aws_access_key_id, aws_secret_access_key, region_name)
+
+    # Upload DataFrames to S3
+    upload_to_s3(dfs, BUCKET_NAME, s3_client)
+
+    # List S3 bucket contents
+    list_contents(BUCKET_NAME, s3_client)
+
+if __name__ == "__main__":
     main()
 ```
 
 <br>
+
+## Data Lake
+## Database in Lake Formation
+## Expenses associated with Project
+## Glue Crawler
 
 ## Public Access Block
 
