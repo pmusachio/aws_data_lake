@@ -120,6 +120,13 @@ flowchart LR
 
 <br>
 
+## The Environment
+## ETL
+## Data Lake
+## Database in Lake Formation
+## Expenses associated with Project
+## Glue Crawler
+## Data Catalog
 ## AWS Connect | Create Bucket W/ Layers | Scapping | Transform to Parquet | Load to Bronze
 
 ```python
@@ -344,7 +351,6 @@ from tb_1
 ```
 
 <br>
-
 
 
 
